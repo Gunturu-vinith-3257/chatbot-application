@@ -1,0 +1,34 @@
+# Hasura Actions Configuration
+actions:
+  - name: sendMessage
+    definition:
+      kind: synchronous
+      handler: ${N8N_WEBHOOK_URL}
+      forward_client_headers: true
+      headers:
+        - name: x-hasura-webhook-secret
+          value_from_env: HASURA_WEBHOOK_SECRET
+    permissions:
+      - role: user
+    comment: Send message to chatbot via n8n workflow
+
+# Action SDL Definition
+custom_types:
+  input_objects:
+    - name: SendMessageInput
+      fields:
+        - name: chat_id
+          type: uuid!
+        - name: content
+          type: String!
+  objects:
+    - name: SendMessageOutput
+      fields:
+        - name: success
+          type: Boolean!
+        - name: message
+          type: String
+        - name: response
+          type: String
+  scalars: []
+  enums: []

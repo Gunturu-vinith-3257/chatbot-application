@@ -1,0 +1,75 @@
+# Hasura Table Permissions for user role
+table:
+  name: chats
+  schema: public
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - id
+        - title
+        - user_id
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: true
+insert_permissions:
+  - role: user
+    permission:
+      columns:
+        - title
+        - user_id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - title
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+
+---
+table:
+  name: messages
+  schema: public
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - id
+        - chat_id
+        - content
+        - role
+        - created_at
+      filter:
+        chat:
+          user_id:
+            _eq: X-Hasura-User-Id
+      allow_aggregations: true
+insert_permissions:
+  - role: user
+    permission:
+      columns:
+        - chat_id
+        - content
+        - role
+      check:
+        chat:
+          user_id:
+            _eq: X-Hasura-User-Id

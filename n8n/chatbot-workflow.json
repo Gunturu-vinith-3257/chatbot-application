@@ -1,0 +1,351 @@
+{
+  "name": "Chatbot Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chatbot",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "chatbot-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract session variables and input from Hasura Action\nconst sessionVariables = $input.first().json.session_variables;\nconst actionInput = $input.first().json.input;\n\n// Validate required data\nif (!sessionVariables['x-hasura-user-id']) {\n  throw new Error('User not authenticated');\n}\n\nif (!actionInput.chat_id || !actionInput.content) {\n  throw new Error('Missing required parameters');\n}\n\nreturn {\n  userId: sessionVariables['x-hasura-user-id'],\n  chatId: actionInput.chat_id,\n  userMessage: actionInput.content,\n  hasuraHeaders: {\n    'x-hasura-admin-secret': process.env.HASURA_ADMIN_SECRET,\n    'Content-Type': 'application/json'\n  }\n};"
+      },
+      "id": "extract-data",
+      "name": "Extract Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.HASURA_GRAPHQL_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-hasura-admin-secret",
+              "value": "={{ $env.HASURA_ADMIN_SECRET }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "query ValidateChat($chatId: uuid!, $userId: uuid!) { chats_by_pk(id: $chatId) { id user_id } }"
+            },
+            {
+              "name": "variables",
+              "value": "={{ { \"chatId\": $json.chatId, \"userId\": $json.userId } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "validate-chat-ownership",
+      "name": "Validate Chat Ownership",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "validation-condition",
+              "leftValue": "={{ $json.data?.chats_by_pk?.user_id }}",
+              "rightValue": "={{ $('Extract Data').item.json.userId }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-ownership",
+      "name": "Check Ownership",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.HASURA_GRAPHQL_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-hasura-admin-secret",
+              "value": "={{ $env.HASURA_ADMIN_SECRET }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "mutation InsertUserMessage($chatId: uuid!, $content: String!) { insert_messages_one(object: {chat_id: $chatId, content: $content, role: \"user\"}) { id } }"
+            },
+            {
+              "name": "variables",
+              "value": "={{ { \"chatId\": $('Extract Data').item.json.chatId, \"content\": $('Extract Data').item.json.userMessage } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "insert-user-message",
+      "name": "Insert User Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 180]
+    },
+    {
+      "parameters": {
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.OPENROUTER_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "openai/gpt-3.5-turbo"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{ \"role\": \"system\", \"content\": \"You are a helpful AI assistant.\" }, { \"role\": \"user\", \"content\": $('Extract Data').item.json.userMessage }] }}"
+            },
+            {
+              "name": "max_tokens",
+              "value": 500
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "call-openrouter",
+      "name": "Call OpenRouter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the AI response\nconst response = $input.first().json;\nconst aiMessage = response.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.';\n\nreturn {\n  aiResponse: aiMessage,\n  chatId: $('Extract Data').item.json.chatId\n};"
+      },
+      "id": "extract-ai-response",
+      "name": "Extract AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 180]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.HASURA_GRAPHQL_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-hasura-admin-secret",
+              "value": "={{ $env.HASURA_ADMIN_SECRET }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "mutation InsertAIMessage($chatId: uuid!, $content: String!) { insert_messages_one(object: {chat_id: $chatId, content: $content, role: \"assistant\"}) { id } }"
+            },
+            {
+              "name": "variables",
+              "value": "={{ { \"chatId\": $json.chatId, \"content\": $json.aiResponse } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "insert-ai-message",
+      "name": "Insert AI Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1780, 180]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Message sent successfully\", \"response\": $('Extract AI Response').item.json.aiResponse } }}"
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2000, 180]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"message\": \"Unauthorized: You don't own this chat\" } }}",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "unauthorized-response",
+      "name": "Unauthorized Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 420]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Data": {
+      "main": [
+        [
+          {
+            "node": "Validate Chat Ownership",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Chat Ownership": {
+      "main": [
+        [
+          {
+            "node": "Check Ownership",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Ownership": {
+      "main": [
+        [
+          {
+            "node": "Insert User Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unauthorized Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert User Message": {
+      "main": [
+        [
+          {
+            "node": "Call OpenRouter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call OpenRouter": {
+      "main": [
+        [
+          {
+            "node": "Extract AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract AI Response": {
+      "main": [
+        [
+          {
+            "node": "Insert AI Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert AI Message": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}
