@@ -6,8 +6,8 @@ import Providers from './providers'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'AI Chatbot - Powered by Nhost & Hasura',
-  description: 'A modern chatbot application with real-time messaging, authentication, and AI responses.',
+  title: 'AI Chatbot - GraphQL Frontend',
+  description: 'A modern chatbot application with GraphQL, real-time messaging, and AI responses.',
 }
 
 export default function RootLayout({

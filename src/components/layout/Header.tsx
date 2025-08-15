@@ -1,20 +1,22 @@
 'use client'
 
-import { useSignOut, useUserData } from '@nhost/nextjs'
+import { useUserData } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { LogOut, MessageSquare, User } from 'lucide-react'
+import { signOut } from '@/lib/auth'
 
 /**
  * Application header with user info and sign-out functionality
  */
 export default function Header() {
   const user = useUserData()
-  const { signOut } = useSignOut()
   const router = useRouter()
 
   const handleSignOut = async () => {
     await signOut()
     router.push('/auth/signin')
+    // Trigger a page reload to update auth state
+    window.location.reload()
   }
 
   return (

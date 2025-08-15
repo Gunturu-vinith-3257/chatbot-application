@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useSignInEmailPassword } from '@nhost/nextjs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { signIn } from '@/lib/auth'
 
 /**
  * Sign-in form component with email and password authentication
@@ -13,17 +13,26 @@ export default function SignInForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const { signInEmailPassword, isLoading, error } = useSignInEmailPassword()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
+    setError(null)
     
-    const result = await signInEmailPassword(email, password)
+    const result = await signIn(email, password)
     
-    if (result.isSuccess) {
+    if (result.success) {
       router.push('/chat')
+      // Trigger a page reload to update auth state
+      window.location.reload()
+    } else {
+      setError(result.error || 'Sign in failed')
     }
+    
+    setIsLoading(false)
   }
 
   return (
@@ -105,7 +114,7 @@ export default function SignInForm() {
           {error && (
             <div className="rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-700">
-                {error.message || 'An error occurred during sign in'}
+                {error}
               </div>
             </div>
           )}

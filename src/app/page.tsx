@@ -1,6 +1,6 @@
 'use client'
 
-import { useAuthenticationStatus } from '@nhost/nextjs'
+import { useAuthenticationStatus } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'

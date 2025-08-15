@@ -14,6 +14,7 @@ import LoadingSpinner from '../ui/LoadingSpinner'
 import { GET_CHATS, GET_CHAT_WITH_MESSAGES, MESSAGES_SUBSCRIPTION } from '@/lib/graphql/queries'
 import { CREATE_CHAT, INSERT_MESSAGE, SEND_MESSAGE_ACTION } from '@/lib/graphql/mutations'
 import { Chat, Message, GetChatsData, GetChatWithMessagesData } from '@/types/chat'
+import { useUserData } from '@/hooks/useAuth'
 
 /**
  * Main chat interface component managing chat list, messages, and real-time updates
@@ -21,17 +22,21 @@ import { Chat, Message, GetChatsData, GetChatWithMessagesData } from '@/types/ch
 export default function ChatInterface() {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [isLoadingResponse, setIsLoadingResponse] = useState(false)
+  const user = useUserData()
   const router = useRouter()
 
   // Query all chats
-  const { data: chatsData, loading: chatsLoading } = useQuery<GetChatsData>(GET_CHATS)
+  const { data: chatsData, loading: chatsLoading } = useQuery<GetChatsData>(GET_CHATS, {
+    variables: { user_id: user?.id },
+    skip: !user?.id,
+  })
 
   // Query selected chat with messages
   const { data: chatData, loading: chatLoading } = useQuery<GetChatWithMessagesData>(
     GET_CHAT_WITH_MESSAGES,
     {
-      variables: { chatId: selectedChatId },
-      skip: !selectedChatId,
+      variables: { chatId: selectedChatId, user_id: user?.id },
+      skip: !selectedChatId || !user?.id,
     }
   )
 
@@ -60,9 +65,11 @@ export default function ChatInterface() {
   }, [chatsData, selectedChatId])
 
   const handleNewChat = async () => {
+    if (!user?.id) return
+    
     try {
       const result = await createChat({
-        variables: { title: 'New Chat' }
+        variables: { title: 'New Chat', user_id: user.id }
       })
       
       if (result.data?.insert_chats_one) {
@@ -78,6 +85,8 @@ export default function ChatInterface() {
   }
 
   const handleSendMessage = async (content: string) => {
+    if (!user?.id) return
+    
     if (!selectedChatId) {
       // Create new chat if none selected
       await handleNewChat()
@@ -117,7 +126,7 @@ export default function ChatInterface() {
   // Get current messages (prefer subscription data over query data)
   const currentMessages: Message[] = messagesData?.messages || chatData?.chats_by_pk?.messages || []
 
-  if (chatsLoading) {
+  if (chatsLoading || !user) {
     return (
       <div className="h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />

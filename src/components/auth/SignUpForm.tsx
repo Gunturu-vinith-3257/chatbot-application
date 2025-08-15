@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useSignUpEmailPassword } from '@nhost/nextjs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react'
+import { signUp } from '@/lib/auth'
 
 /**
  * Sign-up form component with email and password registration
@@ -16,23 +16,32 @@ export default function SignUpForm() {
   const [displayName, setDisplayName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const { signUpEmailPassword, isLoading, error } = useSignUpEmailPassword()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (password !== confirmPassword) {
+      setError('Passwords do not match')
       return
     }
     
-    const result = await signUpEmailPassword(email, password, {
-      displayName: displayName || undefined,
-    })
+    setIsLoading(true)
+    setError(null)
     
-    if (result.isSuccess) {
+    const result = await signUp(email, password, displayName)
+    
+    if (result.success) {
       router.push('/chat')
+      // Trigger a page reload to update auth state
+      window.location.reload()
+    } else {
+      setError(result.error || 'Sign up failed')
     }
+    
+    setIsLoading(false)
   }
 
   const passwordsMatch = password === confirmPassword || confirmPassword === ''
@@ -175,7 +184,7 @@ export default function SignUpForm() {
           {error && (
             <div className="rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-700">
-                {error.message || 'An error occurred during sign up'}
+                {error}
               </div>
             </div>
           )}

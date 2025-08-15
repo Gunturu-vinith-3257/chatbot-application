@@ -1,22 +1,22 @@
 'use client'
 
-import { NhostProvider } from '@nhost/nextjs'
-import { NhostApolloProvider } from '@nhost/react-apollo'
-import { nhost } from '@/lib/nhost'
+import { ApolloProvider } from '@apollo/client'
+import { apolloClient } from '@/lib/apollo'
+import { AuthProvider } from '@/hooks/useAuth'
 
 interface ProvidersProps {
   children: React.ReactNode
 }
 
 /**
- * Root providers component wrapping the app with Nhost and Apollo providers
+ * Root providers component wrapping the app with Apollo and Auth providers
  */
 export default function Providers({ children }: ProvidersProps) {
   return (
-    <NhostProvider nhost={nhost}>
-      <NhostApolloProvider nhost={nhost}>
+    <AuthProvider>
+      <ApolloProvider client={apolloClient}>
         {children}
-      </NhostApolloProvider>
-    </NhostProvider>
+      </ApolloProvider>
+    </AuthProvider>
   )
 }

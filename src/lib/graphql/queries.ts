@@ -2,8 +2,8 @@ import { gql } from '@apollo/client'
 
 // Query to get all chats for the current user
 export const GET_CHATS = gql`
-  query GetChats {
-    chats(order_by: { updated_at: desc }) {
+  query GetChats($user_id: uuid!) {
+    chats(where: { user_id: { _eq: $user_id } }, order_by: { updated_at: desc }) {
       id
       title
       created_at
@@ -19,12 +19,13 @@ export const GET_CHATS = gql`
 
 // Query to get a specific chat with its messages
 export const GET_CHAT_WITH_MESSAGES = gql`
-  query GetChatWithMessages($chatId: uuid!) {
+  query GetChatWithMessages($chatId: uuid!, $user_id: uuid!) {
     chats_by_pk(id: $chatId) {
       id
       title
       created_at
       updated_at
+      user_id
       messages(order_by: { created_at: asc }) {
         id
         content
@@ -52,8 +53,8 @@ export const MESSAGES_SUBSCRIPTION = gql`
 
 // Subscription to listen for chat updates
 export const CHATS_SUBSCRIPTION = gql`
-  subscription ChatsSubscription {
-    chats(order_by: { updated_at: desc }) {
+  subscription ChatsSubscription($user_id: uuid!) {
+    chats(where: { user_id: { _eq: $user_id } }, order_by: { updated_at: desc }) {
       id
       title
       created_at
